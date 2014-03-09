@@ -10,16 +10,16 @@ int main(int argc, char *argv[])
 
 	for (i = 1; i < argc; i++) {
 		strncpy(fileName, argv[i], BLOCK_SIZE);
-
 		filePath = fopen(fileName, "r");
 		if (filePath == NULL) {
 			printf("%s: No such file or directory\n", fileName);
-			return 0;
-		}
-
+			continue;
+		}		
+	
 		while ((ch = fgetc(filePath)) != EOF) {
 			putchar(ch);
 		}
+
 		fclose(filePath);
 	}
 

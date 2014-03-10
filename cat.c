@@ -5,7 +5,8 @@
 int main(int argc, char *argv[])
 {
 	char ch;
-
+	
+	// if command line arguments exist
 	if (argc > 1) {
 		FILE *filePath;
 		char fileName[BLOCK_SIZE];
@@ -18,7 +19,8 @@ int main(int argc, char *argv[])
 				printf("%s: No such file or directory\n", fileName);
 				continue;
 			}		
-	
+			
+			// write file contents to stdout
 			while ((ch = fgetc(filePath)) != EOF) {
 				fputc(ch, stdout);
 			}
@@ -26,6 +28,7 @@ int main(int argc, char *argv[])
 			fclose(filePath);
 		}
 	} else {
+		// if no command line arguments exist
 		while ((ch = fgetc(stdin)) != EOF) {
 			fputc(ch, stdout);
 		}

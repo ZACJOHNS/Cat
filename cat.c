@@ -26,48 +26,14 @@ int main(int argc, char *argv[])
 		}
 	}
 	
+	// If file arguments exist
 	if (optind < argc) {
 		while (optind < argc)
 			formatFileOutput(argv[optind++]);
-	}
-	
-	return EXIT_SUCCESS;
-	
-	/*
-	// helper variables
-	char ch;
-	int i;
-	
-	// if command line arguments exist (only support for file names)
-	if (argc > 1) {
-		FILE *filePath;
-		char fileName[BLOCK_SIZE];
-
-		for (i = 1; i < argc; i++) {
-			strncpy(fileName, argv[i], BLOCK_SIZE);
-			filePath = fopen(fileName, "r");
-			if (filePath == NULL) {
-				printf("%s: No such file or directory\n", fileName);
-				continue;
-			}		
-			
-			//  write file contents to stdout
-			// requires error checking! (EOF)
-			while ((ch = fgetc(filePath)) != EOF) {
-				fputc(ch, stdout);
-			}
-
-			fclose(filePath);
-		}
 	} else {
-		// if no command line arguments exist (no file name specified)
-		// requires error checking! (EOF)
-		while ((ch = fgetc(stdin)) != EOF) {
-			fputc(ch, stdout);
-		}
-	}
+		formatRawOutput();
+	
 	return EXIT_SUCCESS;
-	*/
 }
 
 void ParseArgs(int argc, char *argv[])
@@ -101,21 +67,42 @@ void ParseArgs(int argc, char *argv[])
 
 void formatFileOutput(const char *fileName)
 {
-	char ch;
+	char ch, prev;
+	int line = 0;
+	
+	// Open file and assign ptr
 	FILE *input = Fopen(fileName, "r");
 	
-	if (input == NULL)
-		return;
-	
-	while ((ch = fgetc(input)) != EOF) {
-		// format and display file contents
-		fputc(ch, stdout);
-	}
-	if (ferror(input)) {
-		// handle error
-	}
-	
+	if (input != NULL) {
+		for (prev = '\n'; (ch = getc(input)) != EOF; prev = ch) {
+			// Line numbers
+			if (nFlag && prev == '\n') {
+				fprintf(stdout, "%6d\t", ++line);
+				if (ferror(stdout))
+					break;
+			}
+			
+			// Dollar sign at end of line
+			if (eFlag && ch == '\n') {
+				fputc('$', stdout);
+				if (ferror(stdout))
+					break;
+			}
+			
+			// after appropriate formatting, print current character
+			fputc(ch, stdout);
+		}
+		if (ferror(input)) {
+			printf("Error reading from, %s", fileName);
+		}
+		
 	fclose(input);
+	}
+}
+
+void formatRawOutput()
+{
+	
 }
 
 FILE *Fopen(const char *fileName, const char *mode)

@@ -10,8 +10,11 @@
 // Command Line Argument list
 int nFlag = 0, eFlag = 0;
 
+// Function Headers
 void ParseArgs(int argc, char *argv[]);
-FILE *Fopen(const char *path, const char *mode);
 void formatFileOutput(const char *fileName);
+void formatRawOutput();
+
+FILE *Fopen(const char *path, const char *mode);
 
 #endif

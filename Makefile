@@ -1,7 +1,16 @@
-all:	hello cat
+# Variables
+CC = clang
 
-hello:	hello.c
-	clang -Wall -std=c99 -o hello hello.c
+# Generic Rules
+.c.o: 	$(CC) -c -Wall -std=c99 -o $*.o $*.c
 
-cat:	cat.c
-	clang -Wall -std=c99 -o cat cat.c
+# Make Rules
+cat: 	cat.o
+		$(CC) -o cat cat.o
+
+cat.o:	cat.h cat.c
+
+# Clean Rules
+.PHONY: clean
+clean:	
+	rm cat cat.o

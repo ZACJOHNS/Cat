@@ -12,8 +12,7 @@ int nFlag = 0, eFlag = 0;
 
 // Function Headers
 void ParseArgs(int argc, char *argv[]);
-void formatFileOutput(const char *fileName);
-void formatRawOutput();
+void FormatOutput(FILE *input);
 
 FILE *Fopen(const char *path, const char *mode);
 

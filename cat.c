@@ -26,12 +26,16 @@ int main(int argc, char *argv[])
 		}
 	}
 	
+	FILE *input;
 	// If file arguments exist
 	if (optind < argc) {
-		while (optind < argc)
-			formatFileOutput(argv[optind++]);
+		while (optind < argc) {
+			input = Fopen((argv[optind++]), "r");
+			FormatOutput(input);
+		}
 	} else {
-		formatRawOutput();
+		FormatOutput(stdin);
+	}
 	
 	return EXIT_SUCCESS;
 }
@@ -65,44 +69,41 @@ void ParseArgs(int argc, char *argv[])
 	*/
 }
 
-void formatFileOutput(const char *fileName)
+void FormatOutput(FILE *input)
 {
 	char ch, prev;
 	int line = 0;
-	
-	// Open file and assign ptr
-	FILE *input = Fopen(fileName, "r");
 	
 	if (input != NULL) {
 		for (prev = '\n'; (ch = getc(input)) != EOF; prev = ch) {
 			// Line numbers
 			if (nFlag && prev == '\n') {
 				fprintf(stdout, "%6d\t", ++line);
-				if (ferror(stdout))
+				if (ferror(stdout)) {
 					break;
+				}
 			}
 			
 			// Dollar sign at end of line
 			if (eFlag && ch == '\n') {
 				fputc('$', stdout);
-				if (ferror(stdout))
+				if (ferror(stdout)) {
 					break;
+				}
 			}
 			
 			// after appropriate formatting, print current character
 			fputc(ch, stdout);
 		}
 		if (ferror(input)) {
-			printf("Error reading from, %s", fileName);
+			printf("ERROR: error reading from input");
+		}
+		if (ferror(stdout)) {
+			printf("ERROR: stdout error");
 		}
 		
 	fclose(input);
 	}
-}
-
-void formatRawOutput()
-{
-	
 }
 
 FILE *Fopen(const char *fileName, const char *mode)

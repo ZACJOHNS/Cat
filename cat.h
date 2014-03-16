@@ -8,14 +8,10 @@
 #include <getopt.h>
 
 // Command Line Argument list
-struct Args {
-	int nFlag;
-	int eFlag;
-};
-
-struct Args args;
+int nFlag = 0, eFlag = 0;
 
 void ParseArgs(int argc, char *argv[]);
 FILE *Fopen(const char *path, const char *mode);
+void formatFileOutput(const char *fileName);
 
 #endif

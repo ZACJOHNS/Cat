@@ -9,27 +9,29 @@
 int main(int argc, char *argv[])
 {
 	// Parse cmd line arguments and set appropriate flags
-	ParseArgs(argc, argv);
-	
-	
-	
-	
-	/*FILE *in;
-	unsigned count = 0;
-	int ch;
-	
-	in = stdin;
-	
-	while ((ch = fgetc(in)) != EOF) {
-		count++;
+	int c;
+	while ((c = getopt(argc, argv, "nE")) != -1) {
+		switch(c) {
+			case 'n':
+				nFlag = 1;
+				break;
+			case 'E':
+				eFlag = 1;
+				break;
+			default: /* '?' */
+				fprintf(stderr,
+						"Error: Unknown option character '\\x%x'.\n",
+						optopt);
+				exit(EXIT_FAILURE);
+		}
 	}
-	if (ferror(in)) {
-		// handle error
+	
+	if (optind < argc) {
+		while (optind < argc)
+			formatFileOutput(argv[optind++]);
 	}
-	* */
 	
 	return EXIT_SUCCESS;
-	
 	
 	/*
 	// helper variables
@@ -70,6 +72,8 @@ int main(int argc, char *argv[])
 
 void ParseArgs(int argc, char *argv[])
 {
+	// not used
+	/*
 	int c;
 	while ((c = getopt(argc, argv, "nE")) != -1) {
 		switch(c) {
@@ -79,7 +83,7 @@ void ParseArgs(int argc, char *argv[])
 			case 'E':
 				args.eFlag = 1;
 				break;
-			default: /* '?' */
+			default: 
 				fprintf(stderr,
 						"Error: Unknown option character '\\x%x'.\n",
 						optopt);
@@ -90,15 +94,36 @@ void ParseArgs(int argc, char *argv[])
 	if (optind < argc) {
 		while (optind < argc)
 			printf("%s ", argv[optind++]);
+		printf("\n");
 	}
+	*/
 }
 
-FILE *Fopen(const char *path, const char *mode)
+void formatFileOutput(const char *fileName)
 {
-	FILE *f = fopen(path, mode);
+	char ch;
+	FILE *input = Fopen(fileName, "r");
+	
+	if (input == NULL)
+		return;
+	
+	while ((ch = fgetc(input)) != EOF) {
+		// format and display file contents
+		fputc(ch, stdout);
+	}
+	if (ferror(input)) {
+		// handle error
+	}
+	
+	fclose(input);
+}
+
+FILE *Fopen(const char *fileName, const char *mode)
+{
+	FILE *f = fopen(fileName, mode);
 	if (f == NULL) {
-		perror(path);
-		exit(EXIT_FAILURE);
+		perror(fileName);
+		return f;
 	}
 	return f;
 }

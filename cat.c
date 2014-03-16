@@ -8,7 +8,6 @@
  */
 int main(int argc, char *argv[])
 {
-	
 	// Parse cmd line arguments and set appropriate flags
 	ParseArgs(argc, argv);
 	
@@ -71,29 +70,27 @@ int main(int argc, char *argv[])
 
 void ParseArgs(int argc, char *argv[])
 {
-	int aflag = 0, bflag = 0, index, c;
-	char *cvalue = NULL;
-	
-	while ((c = getopt(argc, argv, "ab")) != -1) {
+	int c;
+	while ((c = getopt(argc, argv, "nE")) != -1) {
 		switch(c) {
-			case 'a':
-				aflag = 1;
+			case 'n':
+				args.nFlag = 1;
 				break;
-			case 'b':
-				bflag = 1;
+			case 'E':
+				args.eFlag = 1;
 				break;
 			default: /* '?' */
 				fprintf(stderr,
-						"Unknown option character '\\x%x'.\n",
+						"Error: Unknown option character '\\x%x'.\n",
 						optopt);
 				exit(EXIT_FAILURE);
 		}
 	}
-		
-	printf("aflag = %d, bflag = %d\n, optind=%d\n", aflag, bflag, optind);
-		
-		
-	printf("name argument = %s\n", argv[optind]);
+	
+	if (optind < argc) {
+		while (optind < argc)
+			printf("%s ", argv[optind++]);
+	}
 }
 
 FILE *Fopen(const char *path, const char *mode)

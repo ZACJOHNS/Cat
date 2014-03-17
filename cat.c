@@ -34,6 +34,7 @@ int main(int argc, char *argv[])
 			FormatOutput(input);
 		}
 	} else {
+		// Format raw input 
 		FormatOutput(stdin);
 	}
 	
@@ -69,6 +70,11 @@ void ParseArgs(int argc, char *argv[])
 	*/
 }
 
+/* Format Output Function
+ *  Purpose: Takes an input and formats output appropriate to set flags.
+ * 	Input: FILE determined by a file path or standard input (stdin).
+ * 	Output: Writes formatted output to stdout, no return type.
+ */
 void FormatOutput(FILE *input)
 {
 	char ch, prev;
@@ -76,7 +82,7 @@ void FormatOutput(FILE *input)
 	
 	if (input != NULL) {
 		for (prev = '\n'; (ch = getc(input)) != EOF; prev = ch) {
-			// Line numbers
+			// (-n) Line numbers
 			if (nFlag && prev == '\n') {
 				fprintf(stdout, "%6d\t", ++line);
 				if (ferror(stdout)) {
@@ -84,7 +90,7 @@ void FormatOutput(FILE *input)
 				}
 			}
 			
-			// Dollar sign at end of line
+			// (-E) Dollar sign at end of line
 			if (eFlag && ch == '\n') {
 				fputc('$', stdout);
 				if (ferror(stdout)) {
@@ -106,6 +112,11 @@ void FormatOutput(FILE *input)
 	}
 }
 
+/* Fopen Function
+ *  Purpose: fopen extension with simple error checking
+ * 	Input: Filepath and single char mode
+ * 	Output: Returns a pointer to the new FILE 
+ */
 FILE *Fopen(const char *fileName, const char *mode)
 {
 	FILE *f = fopen(fileName, mode);

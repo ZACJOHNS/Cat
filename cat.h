@@ -9,7 +9,7 @@
 
 // Member Variables
 // Command Line Argument list
-int nFlag = 0, eFlag = 0, bFlag = 0, sFlag = 0, vFlag = 0;
+int nFlag = 0, eFlag = 0, bFlag = 0, sFlag = 0, vFlag = 0, tFlag = 0;
 
 // Member Functions
 // Function Headers

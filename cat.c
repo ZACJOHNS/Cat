@@ -10,13 +10,13 @@ int main(int argc, char *argv[])
 {
 	// Parse cmd line arguments and set appropriate flags
 	int c;
-	while ((c = getopt(argc, argv, "nEbsv")) != -1) {
+	while ((c = getopt(argc, argv, "nebsvt")) != -1) {
 		switch(c) {
 			case 'n':
 				nFlag = 1;
 				break;
-			case 'E':
-				eFlag = 1;
+			case 'e':
+				eFlag = 1, vFlag = 1;
 				break;
 			case 'b':
 				bFlag = 1, nFlag = 1;
@@ -26,6 +26,9 @@ int main(int argc, char *argv[])
 				break;
 			case 'v':
 				vFlag = 1;
+				break;
+			case 't':
+				tFlag = 1, vFlag = 1;
 				break;
 			default: /* '?' */
 				fprintf(stderr,
@@ -92,6 +95,7 @@ void FormatOutput(FILE *input)
 	if (input != NULL) {
 		for (prev = '\n'; (ch = getc(input)) != EOF; prev = ch) {
 			
+			// is sflag is set skip blank lines > 1
 			if (prev == '\n') {
 				if (sFlag) {
 					if (ch == '\n') {
@@ -100,25 +104,32 @@ void FormatOutput(FILE *input)
 					} else 
 						skipLine = 0;
 				}
+				// print appropriate line number 
 				if (nFlag && (!bFlag || ch != '\n')) {
 					fprintf(stdout, "%6d\t", ++line);
 				}
 			}
 			
-			
+			// if at the end of a line (indicated by '\n') 
 			if (ch == '\n') {
 				if (eFlag) {
 					fputc('$', stdout);
 				}
+			
+			// if not at the end of a line and current char == tab char
+			} else if (ch == '\t') {
+				if (tFlag) {
+					fprintf(stdout, "%s", "^I");
+					// t implies v so we must continue here
+					continue;
+				}
 			} else if (vFlag) {
 				if (iscntrl(ch)) {
-					fputc('^', stdout);
-					cntrlCh = (ch == '\177' ? '?' : ch | 0100);
-					fputc(cntrlCh, stdout);
+					// ascii control ch 
+					fprintf(stdout, "%c%c", '^', ch | 0100);
+					continue;
 				}
-				
 			}
-			
 			
 			// after appropriate formatting, print current character
 			fputc(ch, stdout);

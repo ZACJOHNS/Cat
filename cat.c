@@ -10,7 +10,7 @@ int main(int argc, char *argv[])
 {
 	// Parse cmd line arguments and set appropriate flags
 	int c;
-	while ((c = getopt(argc, argv, "nEb")) != -1) {
+	while ((c = getopt(argc, argv, "nEbs")) != -1) {
 		switch(c) {
 			case 'n':
 				nFlag = 1;
@@ -20,6 +20,9 @@ int main(int argc, char *argv[])
 				break;
 			case 'b':
 				bFlag = 1, nFlag = 1;
+				break;
+			case 's':
+				sFlag = 1;
 				break;
 			default: /* '?' */
 				fprintf(stderr,
@@ -81,22 +84,19 @@ void ParseArgs(int argc, char *argv[])
 void FormatOutput(FILE *input)
 {
 	char ch, prev;
-	int line = 0;
+	int line = 0, skipLine = 0;
 	
 	if (input != NULL) {
 		for (prev = '\n'; (ch = getc(input)) != EOF; prev = ch) {
-			// (-n) Line numbers
-			/*
-			if (nFlag && prev == '\n') {
-				fprintf(stdout, "%6d\t", ++line);
-				if (ferror(stdout)) {
-					break;
-				}
-			}
-			*/
-			
 			
 			if (prev == '\n') {
+				if (sFlag) {
+					if (ch == '\n') {
+						if (skipLine) { continue; }
+						skipLine = 1;					
+					} else 
+						skipLine = 0;
+				}
 				if (nFlag && (!bFlag || ch != '\n')) {
 					fprintf(stdout, "%6d\t", ++line);
 					if (ferror(stdout)) {

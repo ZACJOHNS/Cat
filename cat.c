@@ -10,13 +10,16 @@ int main(int argc, char *argv[])
 {
 	// Parse cmd line arguments and set appropriate flags
 	int c;
-	while ((c = getopt(argc, argv, "nE")) != -1) {
+	while ((c = getopt(argc, argv, "nEb")) != -1) {
 		switch(c) {
 			case 'n':
 				nFlag = 1;
 				break;
 			case 'E':
 				eFlag = 1;
+				break;
+			case 'b':
+				bFlag = 1, nFlag = 1;
 				break;
 			default: /* '?' */
 				fprintf(stderr,
@@ -83,10 +86,22 @@ void FormatOutput(FILE *input)
 	if (input != NULL) {
 		for (prev = '\n'; (ch = getc(input)) != EOF; prev = ch) {
 			// (-n) Line numbers
+			/*
 			if (nFlag && prev == '\n') {
 				fprintf(stdout, "%6d\t", ++line);
 				if (ferror(stdout)) {
 					break;
+				}
+			}
+			*/
+			
+			
+			if (prev == '\n') {
+				if (nFlag && (!bFlag || ch != '\n')) {
+					fprintf(stdout, "%6d\t", ++line);
+					if (ferror(stdout)) {
+						break;
+					}
 				}
 			}
 			

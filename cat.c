@@ -10,7 +10,7 @@ int main(int argc, char *argv[])
 {
 	// Parse cmd line arguments and set appropriate flags
 	int c;
-	while ((c = getopt(argc, argv, "nEbs")) != -1) {
+	while ((c = getopt(argc, argv, "nEbsv")) != -1) {
 		switch(c) {
 			case 'n':
 				nFlag = 1;
@@ -23,6 +23,9 @@ int main(int argc, char *argv[])
 				break;
 			case 's':
 				sFlag = 1;
+				break;
+			case 'v':
+				vFlag = 1;
 				break;
 			default: /* '?' */
 				fprintf(stderr,
@@ -83,7 +86,7 @@ void ParseArgs(int argc, char *argv[])
  */
 void FormatOutput(FILE *input)
 {
-	char ch, prev;
+	char ch, prev, cntrlCh;
 	int line = 0, skipLine = 0;
 	
 	if (input != NULL) {
@@ -99,19 +102,23 @@ void FormatOutput(FILE *input)
 				}
 				if (nFlag && (!bFlag || ch != '\n')) {
 					fprintf(stdout, "%6d\t", ++line);
-					if (ferror(stdout)) {
-						break;
-					}
 				}
 			}
 			
-			// (-E) Dollar sign at end of line
-			if (eFlag && ch == '\n') {
-				fputc('$', stdout);
-				if (ferror(stdout)) {
-					break;
+			
+			if (ch == '\n') {
+				if (eFlag) {
+					fputc('$', stdout);
 				}
+			} else if (vFlag) {
+				if (iscntrl(ch)) {
+					fputc('^', stdout);
+					cntrlCh = (ch == '\177' ? '?' : ch | 0100);
+					fputc(cntrlCh, stdout);
+				}
+				
 			}
+			
 			
 			// after appropriate formatting, print current character
 			fputc(ch, stdout);

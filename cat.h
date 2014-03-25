@@ -5,11 +5,11 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-#include <getopt.h>
+#include <ctype.h>
 
 // Member Variables
 // Command Line Argument list
-int nFlag = 0, eFlag = 0, bFlag = 0, sFlag = 0;
+int nFlag = 0, eFlag = 0, bFlag = 0, sFlag = 0, vFlag = 0;
 
 // Member Functions
 // Function Headers

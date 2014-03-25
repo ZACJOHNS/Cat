@@ -53,34 +53,7 @@ int main(int argc, char *argv[])
 	return EXIT_SUCCESS;
 }
 
-void ParseArgs(int argc, char *argv[])
-{
-	// not used
-	/*
-	int c;
-	while ((c = getopt(argc, argv, "nE")) != -1) {
-		switch(c) {
-			case 'n':
-				args.nFlag = 1;
-				break;
-			case 'E':
-				args.eFlag = 1;
-				break;
-			default: 
-				fprintf(stderr,
-						"Error: Unknown option character '\\x%x'.\n",
-						optopt);
-				exit(EXIT_FAILURE);
-		}
-	}
-	
-	if (optind < argc) {
-		while (optind < argc)
-			printf("%s ", argv[optind++]);
-		printf("\n");
-	}
-	*/
-}
+void ParseArgs(int argc, char *argv[]) {}
 
 /* Format Output Function
  *  Purpose: Takes an input and formats output appropriate to set flags.
@@ -123,9 +96,11 @@ void FormatOutput(FILE *input)
 					// t implies v so we must continue here
 					continue;
 				}
+			// if vFlag is set and ch is a ASCII control character (iscntrl)
 			} else if (vFlag) {
 				if (iscntrl(ch)) {
 					// ascii control ch 
+					// bitwise or operation on control character to get printable char
 					fprintf(stdout, "%c%c", '^', ch | 0100);
 					continue;
 				}
@@ -134,13 +109,15 @@ void FormatOutput(FILE *input)
 			// after appropriate formatting, print current character
 			fputc(ch, stdout);
 		}
+		// error handling
 		if (ferror(input)) {
-			printf("ERROR: error reading from input");
+			fprintf(stderr, "ERROR: error reading from input");
 		}
 		if (ferror(stdout)) {
-			printf("ERROR: stdout error");
+			fprintf(stderr, "ERROR: stdout error");
 		}
 		
+	// close input file
 	fclose(input);
 	}
 }

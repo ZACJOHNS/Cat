@@ -18,7 +18,7 @@ int main(int argc, char *argv[])
 			printf("%s", buf);
 		} else {
 			return EXIT_SUCCESS;
-		}
+		} 
 	}
 	
 	return EXIT_SUCCESS;

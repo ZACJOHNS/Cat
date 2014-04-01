@@ -15,11 +15,10 @@ int main(int argc, char *argv[])
 		printf("%s", PROMPT);
 		
 		if (fgets(buf, BUFSIZE, stdin) && strcmp(buf, "exit\n") != 0) {
-			printf("%s", buf);
+			
+			system(buf);
 		} else {
 			return EXIT_SUCCESS;
 		} 
 	}
-	
-	return EXIT_SUCCESS;
 }

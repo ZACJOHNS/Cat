@@ -1,1 +1,7 @@
 MILESTONE 4
+A simple command line interface (CLI).
+
+This program runs a loop within which it accepts user input from stdin, and uses the system() function to run arbitrary system commands (other than the exit command).
+A user inputs a string which is stored within a character string with a predetermined size. The fgets() function accepts a buffer length with is set to 80.
+If the user string is not NULL and is not equal to "exit", it is passed to the system() function for appropriate handling.
+If the user has entered the "exit" command, the program will return EXIT_SUCCESS.

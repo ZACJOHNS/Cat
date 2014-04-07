@@ -2,23 +2,85 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <signal.h>
 
 #define BUFSIZE 80
 
-const char *PROMPT = "CLI> ";
+const char *PROMPT = "CLI > ";
 
-int main(int argc, char *argv[])
+void parse(char *command, int *argc, char *argv[]);
+void call_system(int argc, char *argv[]);
+
+int main()
 {
-	char buf[BUFSIZE];
+	int argc;
+	char command[BUFSIZE];
+	char *argv[64];
 	
 	while(1) {
 		printf("%s", PROMPT);
+		fgets(command, BUFSIZE, stdin);
+		parse(command, &argc, argv);
 		
-		if (fgets(buf, BUFSIZE, stdin) && strcmp(buf, "exit\n") != 0) {
+		if (strcmp(argv[0], "exit") == 0) 
+			exit(EXIT_SUCCESS);
 			
-			system(buf);
-		} else {
-			return EXIT_SUCCESS;
-		} 
+		call_system(argc, argv);
+	} 
+	
+	return EXIT_FAILURE;
+}
+
+/*	Parse Function
+ * 	Takes an input and returns a zero-terminated array of char pointers,
+ *  also returns the number of arguments within the array.
+ *	each of which point to a zero-terminated character string.
+*/ 
+void parse(char *command, int *argc, char *argv[]) 
+{
+	int i = 0;
+	char **next = argv;
+    char *temp = strtok(command, " \n");
+    while (temp != NULL) {
+		i++;
+		*next++ = temp;
+        temp = strtok(NULL, " \n"); 
+    }
+    *next = NULL;
+    *argc = i;
+}
+
+void call_system(int argc, char *argv[]) 
+{
+	int rc = 0, run_bg = 0;
+	
+	// If an ampersand exists at the end of the argument list, set flag and replace argument
+	if (!strcmp(argv[argc-1],"&")) {
+		run_bg = 1;
+		argv[argc-1] = NULL;
+	}
+	
+	// To avoid child zombies the SIGCHLD signal is set
+	signal(SIGCHLD, SIG_IGN); 
+	pid_t pid = fork();
+
+	switch(pid) {
+		case 0:
+			if (execvp(argv[0], argv) < 0) {
+				printf("ERROR: exec failed\n");
+				exit(EXIT_FAILURE);
+			}
+		case -1:
+			printf("ERROR: forking child process failed\n");
+			exit(EXIT_FAILURE);
+		default:
+			if (run_bg) {
+				printf("[proc %d started]\n", pid);
+			} else {
+				if ((waitpid(pid, &rc, 0) != -1)) {
+					// wait for child process to finish
+				}
+			}
 	}
 }
+

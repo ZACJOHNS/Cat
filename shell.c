@@ -35,8 +35,42 @@ int readCommand(char *buffer, char *commandInput)
  terminated strings) -> using the strtok function
  ====================================================================================
  */
- int parseCommand(char *commandLine, struct Command *command) 
- {
+ int parseCommand(char *line, struct Command *command) 
+ { 
+	 int i = 0;
+	 char *start = line;
+	 char *end;
+	 
+	 while (*line != '\0') {		// if not the end of the line
+		if (*line == '"') {
+			*start = *line;
+			*line++;
+			while (*line != '"') {
+				*line++;
+			}
+			
+			*end = *--line;
+			
+			
+			
+		}
+		printf("start: %c, end: %c", *start, *end);
+		*line++;
+	 }
+	 
+	 return 0;
+	 
+	 
+	      //while (*line != '\0') {       /* if not the end of line ....... */ 
+          //while (*line == ' ' || *line == '\t' || *line == '\n')
+               //*line++ = '\0';     /* replace white spaces with 0    */
+          //*argv++ = line;          /* save the argument position     */
+          //while (*line != '\0' && *line != ' ' &&  *line != '\t' && *line != '\n') 
+               //line++;             /* skip the argument until ...    */
+     //}
+     //*argv = '\0';                 /* mark the end of argument list  */
+	 
+	 /*
 	 char *pch;
 	 pch = strtok(commandLine, " ");
 	 
@@ -45,6 +79,7 @@ int readCommand(char *buffer, char *commandInput)
 		 command->argv[i] = pch;
 		 pch = strtok(NULL, " ");
 		 i++;
+
 	 }
 	 command->argc = i;
 	 command->argv[i++] = NULL;
@@ -53,6 +88,7 @@ int readCommand(char *buffer, char *commandInput)
 	 basename(command->argv[0]); // use the basename of the program in the argument array
 	
 	 return 0;
+	 */
  }
  
  /* 
@@ -65,14 +101,20 @@ int readCommand(char *buffer, char *commandInput)
  int executeCommand()
  {
 	 pid_t child_pid, thisChildPid;
-	 int status;
+	 int status, run_bg = 0;
+	
+	 // If an ampersand exists at the end of the argument list, set flag and replace argument
+	 if (!strcmp(command.argv[command.argc-1],"&")) {
+		run_bg = 1;
+		command.argv[command.argc-1] = NULL;
+	 }
 	 
 	 child_pid = fork(); 									// fork a child process
 	 if (child_pid < 0) {
 		 fprintf(stderr, "ERROR: Child forking process failed\n");
 		 exit(EXIT_FAILURE);
 	 } else if (child_pid == 0) {							// CHILD PROCESS
-		 if (execvp(command.argv[0], command.argv) < 0) {     	// execute the command
+		 if (execvp(command.argv[0], command.argv) < 0) {   // execute the command
 			fprintf(stderr, "ERROR: execvp failed\n");
             exit(EXIT_FAILURE);
          }
@@ -159,8 +201,8 @@ int main(int argc, char* argv[])
 			readCommand(commandLine, &commandInput); 		// read command
 			if (strcmp(commandLine, "exit") == 0) break;	// exit shell if appropriate
 			parseCommand(commandLine, &command); 			// parse command into argv[], argc
-			if (processCommand() == 0)						// process commands if nesseccary
-				executeCommand();							// execute command
+			//if (processCommand() == 0)						// process commands if nesseccary
+			//	executeCommand();							// execute command
 		}	
 	}
 

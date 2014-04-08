@@ -3,6 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <signal.h>
+#include <libgen.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 
@@ -53,6 +54,8 @@ void parse(char *command, int *argc, char *argv[])
     }
     *next = NULL;
     *argc = i;
+    
+    argv[0] = basename(argv[0]);
 }
 
 void call_system(int argc, char *argv[]) 

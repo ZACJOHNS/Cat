@@ -17,9 +17,16 @@ hello:	hello.c
 cli:	cli.c
 		$(CC) -o cli cli.c
 
+shell:	shell.o
+		$(CC) -o shell shell.o
+
+shell.o: shell.h shell.c
+
 cat.o:	cat.h cat.c
+
+
 
 # Clean Rules
 .PHONY: clean
 clean:	
-	rm cat cat.o hello cli
+	rm cat cat.o hello cli shell shell.o

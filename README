@@ -10,3 +10,6 @@ THE DIFFERENCES BETWEEN SYSTEM() AND EXECVP()
 - System() will execute a command specified by a commmand argument and return after the command has been completed.
 
 - The execvp() function will replace the current process image with a new process image. The argument list that execvp() accepts must be an array of pointers to null terminated strings.
+
+WHY CALLING THE EXISTING CD SHELL COMMAND WON'T WORK
+- The newly created children through execvp() inherit the working directory from the parent, changing the working directory of the parent after the fork process will not affect any previously created children. Similarily, changing the working directory in a child process won't have any effect on the parent process.

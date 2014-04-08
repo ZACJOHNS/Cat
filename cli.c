@@ -3,6 +3,9 @@
 #include <string.h>
 #include <unistd.h>
 #include <signal.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+
 
 #define BUFSIZE 80
 
@@ -17,6 +20,8 @@ int main()
 	char command[BUFSIZE];
 	char *argv[64];
 	
+	
+	// Missing error handling
 	while(1) {
 		printf("%s", PROMPT);
 		fgets(command, BUFSIZE, stdin);
@@ -61,11 +66,20 @@ void call_system(int argc, char *argv[])
 	}
 	
 	// To avoid child zombies the SIGCHLD signal is set
-	signal(SIGCHLD, SIG_IGN); 
+	signal(SIGCHLD, SIG_IGN); // <-- Must have error handling
+	
+	
 	pid_t pid = fork();
 
 	switch(pid) {
 		case 0:
+		// if the cd command is given change the parent directory and 
+		// exit the switch. (Don't run execvp).
+			if (!strcmp(argv[0], "cd")) {
+				chdir(argv[1]); // <- error handling
+				break;
+			}
+				
 			if (execvp(argv[0], argv) < 0) {
 				printf("ERROR: exec failed\n");
 				exit(EXIT_FAILURE);

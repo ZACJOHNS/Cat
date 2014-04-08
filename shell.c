@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <libgen.h>
 
 #include "shell.h"
 
@@ -47,6 +48,9 @@ int readCommand(char *buffer, char *commandInput)
 	 }
 	 command->argc = i;
 	 command->argv[i++] = NULL;
+	 
+	 command->name = command->argv[0];
+	 basename(command->argv[0]); // use the basename of the program in the argument array
 	
 	 return 0;
  }

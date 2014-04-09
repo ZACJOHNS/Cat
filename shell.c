@@ -31,9 +31,14 @@ int readCommand(char *buffer, char *commandInput)
 
 void createToken(char *start, char *end) 
 {
-	char token[12];
-	int i = 0;
+	char *token;
+	token = malloc(12 * sizeof(char));
 	
+	if (token == NULL) {
+		printf("Error allocating memory!\n"); 
+	}
+	
+	int i = 0;
 	while (start <= end) {
 		token[i++] = *start;
 		start++;

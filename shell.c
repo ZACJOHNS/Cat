@@ -5,6 +5,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <libgen.h>
+#include <ctype.h>
 
 #include "shell.h"
 
@@ -28,6 +29,20 @@ int readCommand(char *buffer, char *commandInput)
 	return 0;
 }
 
+void createToken(char *start, char *end) 
+{
+	char token[12];
+	int i = 0;
+	
+	while (start <= end) {
+		token[i++] = *start;
+		start++;
+	}
+	
+	command.argv[command.argc] = token;
+	command.argc++;
+}
+
  /* 
  ====================================================================================
  PARSE COMMAND FUNCTION
@@ -36,50 +51,52 @@ int readCommand(char *buffer, char *commandInput)
  ====================================================================================
  */
  int parseCommand(char *line, struct Command *command) 
- { 
-	 int i = 0;
-	 char *start = line;
-	 char *end;
-	 
-	 while (*line != '\0') {		// if not the end of the line
-		if (*line == '"') {
-			*start = *line;
-			*line++;
-			while (*line != '"') {
-				*line++;
-			}
-			
-			*end = *--line;
-			
-			
+ {
+	 char *startTok;
+	 enum states { DULL, IN_WORD, IN_STRING } state = DULL;
+	 for (char *p = line; *p != '\0'; p++) {
+		switch (state) {
+			case DULL:
+				if (isspace(*p)) {
+					continue;
+				}
+				if (*p == '"') {
+					state = IN_STRING;
+					startTok = p + 1;
+					continue;
+				}
+				state = IN_WORD;
+				startTok = p;
+				continue;
+			case IN_STRING:
+				if (*p == '"') {
+					createToken(startTok, --p);
+					state = DULL;
+				}
+				continue;
+			case IN_WORD:
+				if (isspace(*p)) {
+					createToken(startTok, --p);
+					state = DULL;
+				}
+				continue;
 			
 		}
-		printf("start: %c, end: %c", *start, *end);
-		*line++;
-	 }
+	}
+	
+	return 0;
 	 
-	 return 0;
-	 
-	 
-	      //while (*line != '\0') {       /* if not the end of line ....... */ 
-          //while (*line == ' ' || *line == '\t' || *line == '\n')
-               //*line++ = '\0';     /* replace white spaces with 0    */
-          //*argv++ = line;          /* save the argument position     */
-          //while (*line != '\0' && *line != ' ' &&  *line != '\t' && *line != '\n') 
-               //line++;             /* skip the argument until ...    */
-     //}
-     //*argv = '\0';                 /* mark the end of argument list  */
 	 
 	 /*
 	 char *pch;
-	 pch = strtok(commandLine, " ");
+	 pch = strtok(commandLine, "\"");
 	 
-	 int i = 0;
+	 i = 0;
 	 while (pch != NULL) {
 		 command->argv[i] = pch;
 		 pch = strtok(NULL, " ");
+		 printf("%s\n", command->argv[i]);
 		 i++;
-
 	 }
 	 command->argc = i;
 	 command->argv[i++] = NULL;
@@ -88,7 +105,7 @@ int readCommand(char *buffer, char *commandInput)
 	 basename(command->argv[0]); // use the basename of the program in the argument array
 	
 	 return 0;
-	 */
+	 * */
  }
  
  /* 
@@ -160,6 +177,14 @@ int readCommand(char *buffer, char *commandInput)
 			changeDir();
 			return 1;
 		}
+		if (strcmp(command.argv[i], ">") == 0) {
+			printf("OUTFILE");
+			return 0;
+		}
+		if (strcmp(command.argv[i], "<") == 0) {
+			printf("INFILE");
+			return 0;
+		}
 	 }
 	 
 	 return 0;
@@ -179,8 +204,7 @@ int readCommand(char *buffer, char *commandInput)
 		 if (chdir(command.argv[1]) == -1) {
 			 printf(" %s: no such directory\n", command.argv[1]);
 		 }
-	 }
-	 
+	 }	 
  }
 
 /* 
@@ -201,8 +225,12 @@ int main(int argc, char* argv[])
 			readCommand(commandLine, &commandInput); 		// read command
 			if (strcmp(commandLine, "exit") == 0) break;	// exit shell if appropriate
 			parseCommand(commandLine, &command); 			// parse command into argv[], argc
-			//if (processCommand() == 0)						// process commands if nesseccary
-			//	executeCommand();							// execute command
+			if (processCommand() == 0) {					// process commands if nesseccary
+				//	executeCommand();						// execute command
+			}			
+			for (int i = 0; i < command.argc; i++) {
+				printf("%s\n", command.argv[i]);
+			}	
 		}	
 	}
 

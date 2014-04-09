@@ -21,6 +21,7 @@ int readCommand(char *commandLine, char *commandInput);
 int parseCommand(char *commandLine, struct Command *command);
 int executeCommand();
 int processCommand();
+void createToken(char *start, char *end);
 void changeDir();
 
 #endif

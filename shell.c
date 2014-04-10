@@ -17,21 +17,21 @@ struct Command command;
  Read user input character by character and store it into the buffer / commandLine
  ====================================================================================
  */
-int readCommand(char *buffer, char *commandInput) 
+int readCommand(char *commandLine, char *commandInput) 
 {
 	buf_chars = 0;
 
 	while ((*commandInput != '\n') && (buf_chars < LINE_LENGTH)) { 
-		buffer[buf_chars++] = *commandInput;	// read characters into buffer
+		commandLine[buf_chars++] = *commandInput;	// read characters into buffer
 		*commandInput = getchar();
 	}
-	buffer[buf_chars] = '\0';					// append terminating null character to end of string
+	commandLine[buf_chars] = '\0';					// append terminating null character to end of string
+
 	return 0;
 }
 
 void createToken(char *start, char *end) 
 {
-	char *token;
 	token = malloc(12 * sizeof(char));
 	
 	if (token == NULL) {
@@ -40,7 +40,8 @@ void createToken(char *start, char *end)
 	
 	int i = 0;
 	while (start <= end) {
-		token[i++] = *start;
+		if (*start != '\\')
+			token[i++] = *start;
 		start++;
 	}
 	
@@ -57,15 +58,17 @@ void createToken(char *start, char *end)
  */
  int parseCommand(char *line, struct Command *command) 
  {
+	 int c, escape = 0;
 	 char *startTok;
 	 enum states { DULL, IN_WORD, IN_STRING } state = DULL;
 	 for (char *p = line; *p != '\0'; p++) {
+		 c = (unsigned char) *p;
 		switch (state) {
 			case DULL:
-				if (isspace(*p)) {
+				if (isspace(c)) {
 					continue;
 				}
-				if (*p == '"') {
+				if (c == '"') {
 					state = IN_STRING;
 					startTok = p + 1;
 					continue;
@@ -74,43 +77,33 @@ void createToken(char *start, char *end)
 				startTok = p;
 				continue;
 			case IN_STRING:
-				if (*p == '"') {
+				if (c == '\\') {
+					escape = 1;
+				}
+				
+				if (c == '"' && escape == 0) {
 					createToken(startTok, --p);
 					state = DULL;
 				}
+				
+				if (c == '"' && escape == 1) {
+					escape = 0;
+				}
 				continue;
 			case IN_WORD:
-				if (isspace(*p)) {
+				if (isspace(c)) { // if word has a space following
 					createToken(startTok, --p);
+					state = DULL;
+				}
+				if (*(p+1) == '\0') { // else if only one word
+					createToken(startTok, p);
 					state = DULL;
 				}
 				continue;
 			
 		}
 	}
-	
 	return 0;
-	 
-	 
-	 /*
-	 char *pch;
-	 pch = strtok(commandLine, "\"");
-	 
-	 i = 0;
-	 while (pch != NULL) {
-		 command->argv[i] = pch;
-		 pch = strtok(NULL, " ");
-		 printf("%s\n", command->argv[i]);
-		 i++;
-	 }
-	 command->argc = i;
-	 command->argv[i++] = NULL;
-	 
-	 command->name = command->argv[0];
-	 basename(command->argv[0]); // use the basename of the program in the argument array
-	
-	 return 0;
-	 * */
  }
  
  /* 
@@ -227,15 +220,19 @@ int main(int argc, char* argv[])
 		if (commandInput == '\n') { 						// if no input continue loop
 			continue;
 		} else {
+			
 			readCommand(commandLine, &commandInput); 		// read command
 			if (strcmp(commandLine, "exit") == 0) break;	// exit shell if appropriate
 			parseCommand(commandLine, &command); 			// parse command into argv[], argc
 			if (processCommand() == 0) {					// process commands if nesseccary
-				//	executeCommand();						// execute command
+					//executeCommand();						// execute command
 			}			
 			for (int i = 0; i < command.argc; i++) {
 				printf("%s\n", command.argv[i]);
-			}	
+			}
+			
+			command.argc = 0;								// reset the argument count
+			//free(token);									// free memory at token
 		}	
 	}
 

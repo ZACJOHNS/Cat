@@ -11,6 +11,8 @@ static char commandLine[LINE_LENGTH];
 static int buf_chars = 0;
 static int run_bg = 0;
 
+char *token;
+
 struct Command {
 	char *name;
 	int argc;

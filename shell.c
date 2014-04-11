@@ -14,7 +14,10 @@
 #define MAXLINE		64
 #define TRUE 		1
 
-int run_bg = 0;
+int run_bg = 0, file_out = 0, file_in = 0;
+
+char outFile[MAXLINE];
+char inFile[MAXLINE];
 
 struct Command {
 	char name[MAXLINE];
@@ -26,6 +29,7 @@ void parse(char *commandLine);
 void process();
 void execute();
 void changeDir(char *path);
+void formatFileOut(int i);
 
 struct Command command;
 
@@ -148,12 +152,29 @@ void process()
 		if (strcmp(command.argv[i], "cd") == 0) {
 			changeDir(command.argv[i+1]);
 		}
+		
+		if (strcmp(command.argv[i], ">") == 0) {
+			file_out = 1;
+			strcpy(outFile, command.argv[i+1]);
+			command.argv[i] = NULL;
+			i++;
+		}
+		
+		if (strcmp(command.argv[i], "<") == 0) {
+			file_in = 1;
+			strcpy(inFile, command.argv[i+1]);
+			command.argv[i] = NULL;
+			i++;
+		}
+		
 		if (strcmp(command.argv[i], "&") == 0) {
 			command.argv[i] = NULL;
 			run_bg = 1;
+			i++;
 		}
 	}
 }
+
 
 /*
 =======================================================
@@ -173,10 +194,30 @@ void execute()
 		exit(EXIT_FAILURE);
 	} else if (pid == 0) {	
 		/* CHILD PROCESS */
+		FILE *file;
+		if (file_out) {
+			file = freopen(outFile, "w", stdout);
+		}
+		
+		if (file_in) {
+			file = freopen(inFile, "r", stdin);
+		}
+		
 		if (execvp(command.name, command.argv) < 0) {
 			printf("ERROR: execvp() : %s\n", strerror(errno));
 			exit(EXIT_FAILURE);
 		}
+		
+		if (file_out) {
+			file_out = 0;
+			fclose(file);
+		}
+		
+		if (file_in) {
+			file_in = 0;
+			fclose(file);
+		}
+		
 	} else if (pid > 0) {	
 		/* PARENT PROCESS */
 		if (!run_bg) {
@@ -189,7 +230,7 @@ void execute()
 				}
 				
 				if (WIFEXITED(status)) {
-					printf("Child process exited, status=%d\n", WEXITSTATUS(status));
+					//printf("Child process exited, status=%d\n", WEXITSTATUS(status));
 				}
 			
 			// while the child process has not exited normally 

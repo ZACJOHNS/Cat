@@ -5,7 +5,7 @@ CC = clang
 .c.o: 	$(CC) -c -Wall -std=c99 -o $*.o $*.c
 
 # All Target
-all:	cat hello cli
+all:	cat hello cli shell
 
 # Make Rules
 cat: 	cat.o

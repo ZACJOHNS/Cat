@@ -1,42 +1,69 @@
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
+#include <errno.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <libgen.h>
+#include <signal.h>
 #include <ctype.h>
 
-#include "shell.h"
+#define MAXARGS 	64
+#define BUFSIZE 	128
+#define MAXLINE		64
+#define TRUE 		1
+
+int run_bg = 0;
+
+struct Command {
+	char name[MAXLINE];
+	int argc;
+	char *argv[MAXARGS];
+};
+
+void parse(char *commandLine);
+void process();
+void execute();
+void changeDir(char *path);
 
 struct Command command;
 
- /* 
- ====================================================================================
- READ COMMAND FUNCTION
- Read user input character by character and store it into the buffer / commandLine
- ====================================================================================
- */
-int readCommand(char *commandLine, char *commandInput) 
+/*
+=======================================================
+MAIN FUNCTION
+=======================================================
+*/
+int main(int argc, char *argv[])
 {
-	buf_chars = 0;
+	char commandLine[BUFSIZE];
+	command.argc = 0;
+	
+	while (TRUE) {
+		printf("SHELL > ");
+		if (fgets(commandLine, BUFSIZE, stdin) == NULL) {
+			printf("ERROR: fgets()\n");
+			return(EXIT_FAILURE);
+		} else if (*commandLine == '\n') {
+			continue;
+		} else {
+			parse(commandLine);
+			process();
+			if (strcmp(command.argv[0], "exit") == 0)
+				return(EXIT_SUCCESS);
+			
+			execute();
+		}
+		
 
-	while ((*commandInput != '\n') && (buf_chars < LINE_LENGTH)) { 
-		commandLine[buf_chars++] = *commandInput;	// read characters into buffer
-		*commandInput = getchar();
+		command.argc = 0;
 	}
-	commandLine[buf_chars] = '\0';					// append terminating null character to end of string
-
-	return 0;
+	return EXIT_FAILURE;
 }
 
 void createToken(char *start, char *end) 
 {
-	token = malloc(12 * sizeof(char));
-	
-	if (token == NULL) {
-		printf("Error allocating memory!\n"); 
-	}
+	char token[MAXLINE];
 	
 	int i = 0;
 	while (start <= end) {
@@ -44,25 +71,25 @@ void createToken(char *start, char *end)
 			token[i++] = *start;
 		start++;
 	}
+	token[i] = '\0';
 	
-	command.argv[command.argc] = token;
+	command.argv[command.argc] = calloc(MAXLINE, sizeof(char));
+	strcpy(command.argv[command.argc], token);
 	command.argc++;
 }
 
- /* 
- ====================================================================================
- PARSE COMMAND FUNCTION
- Parse commandLine into Command struct appropriate for use with execvp (array of null
- terminated strings) -> using the strtok function
- ====================================================================================
- */
- int parseCommand(char *line, struct Command *command) 
- {
-	 int c, escape = 0;
-	 char *startTok;
-	 enum states { DULL, IN_WORD, IN_STRING } state = DULL;
-	 for (char *p = line; *p != '\0'; p++) {
-		 c = (unsigned char) *p;
+/*
+=======================================================
+PARSE FUNCTION
+=======================================================
+*/
+void parse(char *commandLine) 
+{
+	int c, escape = 0;
+	char *startTok;
+	enum states { DULL, IN_WORD, IN_STRING } state = DULL;
+	for (char *p = commandLine; *p != '\0'; p++) {
+	c = (unsigned char) *p;
 		switch (state) {
 			case DULL:
 				if (isspace(c)) {
@@ -103,138 +130,78 @@ void createToken(char *start, char *end)
 			
 		}
 	}
-	return 0;
- }
- 
- /* 
- ====================================================================================
- EXECUTE COMMAND FUNCTION
- Execute command based on the pre-parsed commandLine buffer -> using execvp function
- to fork a process and wait or continue according to the ampersand argument (&) 
- ====================================================================================
- */
- int executeCommand()
- {
-	 pid_t child_pid, thisChildPid;
-	 int status, run_bg = 0;
 	
-	 // If an ampersand exists at the end of the argument list, set flag and replace argument
-	 if (!strcmp(command.argv[command.argc-1],"&")) {
-		run_bg = 1;
-		command.argv[command.argc-1] = NULL;
-	 }
-	 
-	 child_pid = fork(); 									// fork a child process
-	 if (child_pid < 0) {
-		 fprintf(stderr, "ERROR: Child forking process failed\n");
-		 exit(EXIT_FAILURE);
-	 } else if (child_pid == 0) {							// CHILD PROCESS
-		 if (execvp(command.argv[0], command.argv) < 0) {   // execute the command
-			fprintf(stderr, "ERROR: execvp failed\n");
-            exit(EXIT_FAILURE);
-         }
-	 } else if (child_pid > 0) {							// PARENT PROCESS
-	 	if (run_bg) {
-			printf("proccess %d started\n", child_pid);		// run process in background
-		} else {
+	strcpy(command.name, command.argv[0]);
+	command.argv[0] = basename(command.name);
+	
+	command.argv[command.argc] = NULL;
+}
+
+/*
+=======================================================
+PROCESS FUNCTION
+=======================================================
+*/
+void process()
+{
+	for (int i = 0; i < command.argc; i++) {
+		if (strcmp(command.argv[i], "cd") == 0) {
+			changeDir(command.argv[i+1]);
+		}
+		if (strcmp(command.argv[i], "&") == 0) {
+			command.argv[i] = NULL;
+			run_bg = 1;
+		}
+	}
+}
+
+/*
+=======================================================
+EXECUTE FUNCTION
+=======================================================
+*/
+void execute()
+{
+	pid_t pid;
+	pid_t thisChildPid;
+	int status;
+	
+	pid = fork();
+	if (pid == -1) {	
+		/* FORK FAILED */	
+		printf("ERROR: fork()\n");
+		exit(EXIT_FAILURE);
+	} else if (pid == 0) {	
+		/* CHILD PROCESS */
+		if (execvp(command.name, command.argv) < 0) {
+			printf("ERROR: execvp() : %s\n", strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+	} else if (pid > 0) {	
+		/* PARENT PROCESS */
+		if (!run_bg) {
 			do {
-				thisChildPid = waitpid(child_pid, &status, WUNTRACED | WCONTINUED);
+				thisChildPid = waitpid(pid, &status, 0);
+				
 				if (thisChildPid == -1) {
-					perror("waitpid");
+					printf("ERROR: waitpid() : %s\n", strerror(errno));
 					exit(EXIT_FAILURE);
 				}
-				if (WIFEXITED(status)) {
-					printf("exited, status=%d\n", WEXITSTATUS(status));
-					return 0;
-				} else if (WIFSIGNALED(status)) {
-					printf("killed by signal %d\n", WTERMSIG(status));
-				} else if (WIFSTOPPED(status)) {
-					printf("stopped by signal %d\n", WSTOPSIG(status));
-				} else if (WIFCONTINUED(status)) {
-					printf("continued\n");
-				}
 				
-			} while (!WIFEXITED(status) && !WIFSIGNALED(status));
-			 
-		 }
-	 }
-	 return 0;
- }
- 
- /* 
- ====================================================================================
- PROCESS COMMAND FUNCTION
- Checks passed command argument with official command arguments for a match, handles
- program according to results
- ====================================================================================
- */
- int processCommand() 
- {
-	 for (int i = 0; i < command.argc; i++) {
-		if (strcmp(command.argv[i], "cd") == 0) {
-			changeDir();
-			return 1;
-		}
-		if (strcmp(command.argv[i], ">") == 0) {
-			printf("OUTFILE");
-			return 0;
-		}
-		if (strcmp(command.argv[i], "<") == 0) {
-			printf("INFILE");
-			return 0;
-		}
-	 }
-	 
-	 return 0;
- }
- 
-  /* 
- ====================================================================================
- CHANGE DIRECTORY FUNCTION
- Changes directory based on passed parameters. If no directory is given, the directory
- is changed to root.
- ====================================================================================
- */
- void changeDir() {
-	 if (command.argv[1] == NULL) {
-		 chdir(getenv("HOME"));
-	 } else {
-		 if (chdir(command.argv[1]) == -1) {
-			 printf(" %s: no such directory\n", command.argv[1]);
-		 }
-	 }	 
- }
-
-/* 
- ====================================================================================
- MAIN FUNCTION
- ====================================================================================
- */
-int main(int argc, char* argv[]) 
-{
-	int i;
-	
-	while (TRUE) {
-		printf("SHELL > ");
-		commandInput = getchar(); 							// get first character
-		if (commandInput == '\n') { 						// if no input continue loop
-			continue;
-		} else {
+				if (WIFEXITED(status)) {
+					printf("Child process exited, status=%d\n", WEXITSTATUS(status));
+				}
 			
-			readCommand(commandLine, &commandInput); 		// read command
-			if (strcmp(commandLine, "exit") == 0) break;	// exit shell if appropriate
-			parseCommand(commandLine, &command); 			// parse command into argv[], argc
-			if (processCommand() == 0) {					// process commands if nesseccary
-					//executeCommand();						// execute command
-			}			
-			for (int i = 0; i < command.argc; i++) {
-				printf("%s\n", command.argv[i]);
-			}
-			
-			command.argc = 0;								// reset the argument count
-			//free(token);									// free memory at token
-		}	
+			// while the child process has not exited normally 
+			} while (!WIFEXITED(status));
+		}
 	}
+}
 
-	exit(EXIT_SUCCESS);										// shell exited successfully
+void changeDir(char *path) 
+{
+	if (chdir(path) < 0) {
+		printf("ERROR: chdir(): %s\n", strerror(errno));
+	}
+	
 }

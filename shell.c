@@ -17,6 +17,9 @@
 
 int run_bg = 0, file_out = 0, file_in = 0, multiple_progs = 0;
 int progCount = 0;
+int processCount = 0;
+int fgWait = 0;
+pid_t fgPid = -1;
 
 char outFile[MAXLINE];
 char inFile[MAXLINE];
@@ -28,12 +31,13 @@ struct Command {
 };
 
 void parse(char *commandLine);
-void process();
+int process();
 void execute();
 void changeDir(char *path);
 void createCommands();
+void signalHandler(int signal);
+void intstpSignalHandler(int signal);
 
-struct Command commands[MAXCOMMANDS];
 struct Command command;
 
 /*
@@ -55,20 +59,11 @@ int main(int argc, char *argv[])
 			continue;
 		} else {
 			parse(commandLine);
-			process();
 			if (strcmp(command.argv[0], "exit") == 0)
 				return(EXIT_SUCCESS);
-			
-			for (int i = 0; i < command.argc; i++) {
-				printf("%s\n", command.argv[i]);
-				
-			}
-			
-			//if (multiple_progs) {
-			//	createCommands();
-			//}
-			
-			execute();
+		
+			if (process())
+				execute();
 		}
 		command.argc = 0;
 	}
@@ -95,6 +90,7 @@ void createToken(char *start, char *end)
 	command.argv[command.argc] = calloc(MAXLINE, sizeof(char));
 	strcpy(command.argv[command.argc], token);
 	command.argc++;
+	command.argv[command.argc] = NULL;
 }
 
 /*
@@ -120,7 +116,8 @@ void parse(char *commandLine)
 					continue;
 				}
 				if (c == ';') {
-					createToken(p, p);
+					execute();
+					command.argc = 0;
 					continue;
 				}
 				state = IN_WORD;
@@ -151,11 +148,6 @@ void parse(char *commandLine)
 			
 		}
 	}
-	
-	strcpy(command.name, command.argv[0]);
-	command.argv[0] = basename(command.name);
-	
-	command.argv[command.argc] = NULL;
 }
 
 /*
@@ -163,11 +155,12 @@ void parse(char *commandLine)
 PROCESS FUNCTION
 =======================================================
 */
-void process()
+int process()
 {
 	for (int i = 0; i < command.argc; i++) {
 		if (strcmp(command.argv[i], "cd") == 0) {
 			changeDir(command.argv[i+1]);
+			return 0;
 		}
 		
 		if (strcmp(command.argv[i], ">") == 0) {
@@ -183,17 +176,8 @@ void process()
 			command.argv[i] = NULL;
 			i++;
 		}
-		
-		if (strcmp(command.argv[i], ";") == 0) {
-			multiple_progs = 1;
-		}
-		
-		if (strcmp(command.argv[i], "&") == 0) {
-			command.argv[i] = NULL;
-			run_bg = 1;
-			i++;
-		}
 	}
+	return 1;
 }
 
 
@@ -208,6 +192,21 @@ void execute()
 	pid_t thisChildPid;
 	int status;
 	
+	strcpy(command.name, command.argv[0]);
+	command.argv[0] = basename(command.name);
+	
+	if (strcmp(command.argv[command.argc-1], "&") == 0) {
+		run_bg = 1;
+		command.argv[command.argc-1] = NULL;
+	}
+	
+	for (int i = 0; i < command.argc; i++) 
+		printf("Arg %d: %s\n", i, command.argv[i]);
+		
+	signal(SIGINT, intstpSignalHandler);
+	signal(SIGTSTP, intstpSignalHandler);
+	signal(SIGCHLD, signalHandler);
+	
 	pid = fork();
 	if (pid == -1) {	
 		/* FORK FAILED */	
@@ -216,6 +215,7 @@ void execute()
 	} else if (pid == 0) {	
 		/* CHILD PROCESS */
 		FILE *file;
+		
 		if (file_out) {
 			file = freopen(outFile, "w", stdout);
 		}
@@ -242,21 +242,18 @@ void execute()
 	} else if (pid > 0) {	
 		/* PARENT PROCESS */
 		if (!run_bg) {
-			do {
-				thisChildPid = waitpid(pid, &status, 0);
-				
-				if (thisChildPid == -1) {
-					printf("ERROR: waitpid() : %s\n", strerror(errno));
-					exit(EXIT_FAILURE);
-				}
-				
-				if (WIFEXITED(status)) {
-					//printf("Child process exited, status=%d\n", WEXITSTATUS(status));
-				}
+			fgPid = pid;
+			fgWait = TRUE;
 			
-			// while the child process has not exited normally 
-			} while (!WIFEXITED(status));
+			while(fgWait) {
+				pause();
+			}
+		} else {
+			processCount++;
+			printf("[%d] %d\n", processCount, pid);
+			run_bg = 0;
 		}
+				
 	}
 }
 
@@ -270,6 +267,68 @@ void changeDir(char *path)
 	if (chdir(path) < 0) {
 		printf("ERROR: chdir(): %s\n", strerror(errno));
 	}
+}
+
+
+/*
+=======================================================
+SIGNAL HANDLER FUNCTION
+=======================================================
+*/
+void signalHandler(int signal)
+{
+	int status;
+	pid_t pid;
+	
+	pid = wait3(&status, WNOHANG | WUNTRACED | WCONTINUED, NULL);
+	
+	if (pid == -1) {
+		printf("ERROR: waitpid() : %s\n", strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+	
+	if (pid > 0) {
+		if (fgPid == pid) {
+			fgPid = -1;
+			fgWait = 0;
+			
+		} else {
+			if (WIFEXITED(status)) {
+				
+				printf("[%d] %d Done\n", processCount, pid);
+				//printf("[%d] Terminated (Status: %d)\n", pid, WEXITSTATUS(status));
+				processCount--;
+				return;
+			}
+		}
+		if (WIFSIGNALED(status)) {
+			printf("[%d] Terminated (Signal: %d)\n", pid, WTERMSIG(status));
+			processCount--;
+			return;
+		}
+		
+		if (WIFSTOPPED(status)) {
+			printf("[%d] Stopped (Signal: %d)\n", pid, WSTOPSIG(status));
+			processCount--;
+			return;
+		}
+		
+		if (WIFCONTINUED(status)) {
+			printf("[%d] Continued...\n", pid);
+			return;
+		}
+	}
+}
+
+/*
+=======================================================
+INTSTP SIGNAL HANDLER FUNCTION
+=======================================================
+*/
+void intstpSignalHandler(int signal) 
+{
+	if (fgPid != -1)
+		kill(fgPid, signal);
 }
 
 

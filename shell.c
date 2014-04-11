@@ -12,9 +12,11 @@
 #define MAXARGS 	64
 #define BUFSIZE 	128
 #define MAXLINE		64
+#define MAXCOMMANDS	16
 #define TRUE 		1
 
-int run_bg = 0, file_out = 0, file_in = 0;
+int run_bg = 0, file_out = 0, file_in = 0, multiple_progs = 0;
+int progCount = 0;
 
 char outFile[MAXLINE];
 char inFile[MAXLINE];
@@ -29,8 +31,9 @@ void parse(char *commandLine);
 void process();
 void execute();
 void changeDir(char *path);
-void formatFileOut(int i);
+void createCommands();
 
+struct Command commands[MAXCOMMANDS];
 struct Command command;
 
 /*
@@ -56,15 +59,27 @@ int main(int argc, char *argv[])
 			if (strcmp(command.argv[0], "exit") == 0)
 				return(EXIT_SUCCESS);
 			
+			for (int i = 0; i < command.argc; i++) {
+				printf("%s\n", command.argv[i]);
+				
+			}
+			
+			//if (multiple_progs) {
+			//	createCommands();
+			//}
+			
 			execute();
 		}
-		
-
 		command.argc = 0;
 	}
 	return EXIT_FAILURE;
 }
 
+/*
+=======================================================
+CREATE TOKEN FUNCTION
+=======================================================
+*/
 void createToken(char *start, char *end) 
 {
 	char token[MAXLINE];
@@ -104,6 +119,10 @@ void parse(char *commandLine)
 					startTok = p + 1;
 					continue;
 				}
+				if (c == ';') {
+					createToken(p, p);
+					continue;
+				}
 				state = IN_WORD;
 				startTok = p;
 				continue;
@@ -111,12 +130,10 @@ void parse(char *commandLine)
 				if (c == '\\') {
 					escape = 1;
 				}
-				
 				if (c == '"' && escape == 0) {
-					createToken(startTok, --p);
+					createToken(startTok, (p-1));
 					state = DULL;
 				}
-				
 				if (c == '"' && escape == 1) {
 					escape = 0;
 				}
@@ -165,6 +182,10 @@ void process()
 			strcpy(inFile, command.argv[i+1]);
 			command.argv[i] = NULL;
 			i++;
+		}
+		
+		if (strcmp(command.argv[i], ";") == 0) {
+			multiple_progs = 1;
 		}
 		
 		if (strcmp(command.argv[i], "&") == 0) {
@@ -239,10 +260,17 @@ void execute()
 	}
 }
 
+/*
+=======================================================
+CHANGE DIRECTORY FUNCTION
+=======================================================
+*/
 void changeDir(char *path) 
 {
 	if (chdir(path) < 0) {
 		printf("ERROR: chdir(): %s\n", strerror(errno));
 	}
-	
 }
+
+
+

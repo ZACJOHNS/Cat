@@ -200,8 +200,8 @@ void execute()
 		command.argv[command.argc-1] = NULL;
 	}
 	
-	for (int i = 0; i < command.argc; i++) 
-		printf("Arg %d: %s\n", i, command.argv[i]);
+	//for (int i = 0; i < command.argc; i++) 
+	//	printf("Arg %d: %s\n", i, command.argv[i]);
 		
 	signal(SIGINT, intstpSignalHandler);
 	signal(SIGTSTP, intstpSignalHandler);

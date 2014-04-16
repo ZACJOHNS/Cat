@@ -14,6 +14,9 @@ cat: 	cat.o
 hello:	hello.c
 		$(CC) -o hello hello.c
 		
+pipe:	pipe_example.c
+		$(CC) -o pipe pipe_example.c
+
 cli:	cli.c
 		$(CC) -o cli cli.c
 
@@ -29,4 +32,4 @@ cat.o:	cat.h cat.c
 # Clean Rules
 .PHONY: clean
 clean:	
-	rm cat cat.o hello cli shell shell.o
+	rm cat cat.o hello cli shell shell.o pipe

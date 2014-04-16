@@ -3,333 +3,212 @@
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
-#include <sys/types.h>
 #include <sys/wait.h>
-#include <libgen.h>
-#include <signal.h>
-#include <ctype.h>
 
-#define MAXARGS 	64
-#define BUFSIZE 	128
-#define MAXLINE		64
-#define MAXCOMMANDS	16
-#define TRUE 		1
+#include "shell.h"
 
-int run_bg = 0, file_out = 0, file_in = 0, multiple_progs = 0;
-int progCount = 0;
-int processCount = 0;
-int fgWait = 0;
-pid_t fgPid = -1;
+#define MAX_LINE_LENGTH 64
+#define MAX_ARG_NUM     12
 
-char outFile[MAXLINE];
-char inFile[MAXLINE];
+#define NORMAL          0
+#define PIPE            1
 
-struct Command {
-	char name[MAXLINE];
-	int argc;
-	char *argv[MAXARGS];
-};
+#define TRUE            1
+#define FALSE           0
 
-void parse(char *commandLine);
-int process();
-void execute();
-void changeDir(char *path);
-void createCommands();
-void signalHandler(int signal);
-void intstpSignalHandler(int signal);
-
-struct Command command;
+int parse(char *userInput, char *cmdArgv[], char **nextArg, int *modePtr);
+void childOutPipe(int pipeDes[], char *cmdArgv[]);
+void childInPipe(int pipeDes[], char *cmdArgv[]);
+void execute(char *cmdArgv[], int mode, char **nextArg);
+void executePipe(int pipeDes[], char *cmdArgv[], char *cmdArgv2[]);
 
 /*
-=======================================================
+=========================================================================
 MAIN FUNCTION
-=======================================================
+=========================================================================
 */
 int main(int argc, char *argv[])
 {
-	char commandLine[BUFSIZE];
-	command.argc = 0;
-	
-	while (TRUE) {
-		printf("SHELL > ");
-		if (fgets(commandLine, BUFSIZE, stdin) == NULL) {
-			printf("ERROR: fgets()\n");
-			return(EXIT_FAILURE);
-		} else if (*commandLine == '\n') {
-			continue;
-		} else {
-			parse(commandLine);
-			if (strcmp(command.argv[0], "exit") == 0)
-				return(EXIT_SUCCESS);
-		
-			if (process())
-				execute();
-		}
-		command.argc = 0;
-	}
-	return EXIT_FAILURE;
+    char userInput[MAX_LINE_LENGTH];
+    char *cmdArgv[MAX_ARG_NUM];
+    char *nextArg = NULL;
+    int cmdArgc;
+    int mode;
+    int debug = FALSE;
+
+    if (argc > 1)
+    {
+        if (*argv[1] == '1')
+        {
+            debug = TRUE;
+        }
+    }
+
+    while (1)
+    {
+        mode = NORMAL;
+        printf("SHELL > ");
+        if (fgets(userInput, MAX_LINE_LENGTH, stdin) != NULL)
+        {
+            cmdArgc = parse(userInput, cmdArgv, &nextArg, &mode);
+
+            if (strcmp(cmdArgv[0], "exit") == 0)
+                return EXIT_SUCCESS;
+
+            if (debug)
+            {
+                for (int i = 0; i < cmdArgc; i++)
+                    printf("Arg[%d]: %s\n", i, cmdArgv[i]);
+            }
+
+            execute(cmdArgv, mode, &nextArg);
+
+        }
+    }
+    return EXIT_FAILURE;
 }
 
-/*
-=======================================================
-CREATE TOKEN FUNCTION
-=======================================================
-*/
-void createToken(char *start, char *end) 
+int parse(char *userInput, char *cmdArgv[], char **nextArg, int *modePtr)
 {
-	char token[MAXLINE];
-	
-	int i = 0;
-	while (start <= end) {
-		if (*start != '\\')
-			token[i++] = *start;
-		start++;
-	}
-	token[i] = '\0';
-	
-	command.argv[command.argc] = calloc(MAXLINE, sizeof(char));
-	strcpy(command.argv[command.argc], token);
-	command.argc++;
-	command.argv[command.argc] = NULL;
+    int cmdArgc = 0;
+    int terminate = 0;
+    char *ptr = userInput;
+
+    while (*ptr != '\0' && terminate == 0)
+    {
+        *cmdArgv = ptr;
+        cmdArgc++;
+
+        while (*ptr != ' ' && *ptr != '\t' && *ptr != '\0' && *ptr != '\n' && terminate == 0)
+        {
+            switch (*ptr)
+            {
+                case '|':
+                    *modePtr = PIPE;
+                    *cmdArgv = '\0';
+                    ptr++;
+                    while (*ptr == ' ' || *ptr == '\t')
+                        ptr++;
+                    *nextArg = ptr;
+                    terminate = 1;
+                    break;
+            }
+            ptr++;
+        }
+
+        while ((*ptr == ' ' || *ptr == '\t' || *ptr == '\n') && terminate == 0)
+        {
+            *ptr = '\0';
+            ptr++;
+        }
+
+        cmdArgv++;
+    }
+
+    *cmdArgv = '\0';
+    return cmdArgc;
 }
 
-/*
-=======================================================
-PARSE FUNCTION
-=======================================================
-*/
-void parse(char *commandLine) 
+void execute(char *cmdArgv[], int mode, char **nextArg)
 {
-	int c, escape = 0;
-	char *startTok;
-	enum states { DULL, IN_WORD, IN_STRING } state = DULL;
-	for (char *p = commandLine; *p != '\0'; p++) {
-	c = (unsigned char) *p;
-		switch (state) {
-			case DULL:
-				if (isspace(c)) {
-					continue;
-				}
-				if (c == '"') {
-					state = IN_STRING;
-					startTok = p + 1;
-					continue;
-				}
-				if (c == ';') {
-					execute();
-					command.argc = 0;
-					continue;
-				}
-				state = IN_WORD;
-				startTok = p;
-				continue;
-			case IN_STRING:
-				if (c == '\\') {
-					escape = 1;
-				}
-				if (c == '"' && escape == 0) {
-					createToken(startTok, (p-1));
-					state = DULL;
-				}
-				if (c == '"' && escape == 1) {
-					escape = 0;
-				}
-				continue;
-			case IN_WORD:
-				if (isspace(c)) { // if word has a space following
-					createToken(startTok, --p);
-					state = DULL;
-				}
-				if (*(p+1) == '\0') { // else if only one word
-					createToken(startTok, p);
-					state = DULL;
-				}
-				continue;
-			
-		}
-	}
+    pid_t pid;
+    int status;
+
+    int mode2 = NORMAL;
+    char *nextArg2;
+    char *cmdArgv2[MAX_LINE_LENGTH];
+
+    int pipeDes[2];
+
+    switch (mode)
+    {
+        case PIPE:
+            if (pipe(pipeDes) == -1)
+            {
+                fprintf(stderr, "Error: %s: cannot open pipe: %s\n", cmdArgv[0], strerror(errno));
+                exit(EXIT_FAILURE);
+            }
+            parse(*nextArg, cmdArgv2, &nextArg2, &mode2);
+            executePipe(pipeDes, cmdArgv, cmdArgv2);
+            break;
+
+        case NORMAL:
+            pid = fork();
+
+            if (pid < 0)
+            {
+                fprintf(stderr, "Error: %s: cannot create child: %s\n", cmdArgv[0], strerror(errno));
+                exit(EXIT_FAILURE);
+            }
+            else if (pid == 0)
+                execvp(cmdArgv[0], cmdArgv);
+            break;
+    }
+
+    while ((pid = wait(&status)) >= 0)
+    {
+        if (WEXITSTATUS(status) != 0)
+            fprintf(stderr, "child %d exited with code %d\n", pid, WEXITSTATUS(status));
+    }
 }
 
-/*
-=======================================================
-PROCESS FUNCTION
-=======================================================
-*/
-int process()
+void executePipe(int pipeDes[], char *cmdArgv[], char *cmdArgv2[])
 {
-	for (int i = 0; i < command.argc; i++) {
-		if (strcmp(command.argv[i], "cd") == 0) {
-			changeDir(command.argv[i+1]);
-			return 0;
-		}
-		
-		if (strcmp(command.argv[i], ">") == 0) {
-			file_out = 1;
-			strcpy(outFile, command.argv[i+1]);
-			command.argv[i] = NULL;
-			i++;
-		}
-		
-		if (strcmp(command.argv[i], "<") == 0) {
-			file_in = 1;
-			strcpy(inFile, command.argv[i+1]);
-			command.argv[i] = NULL;
-			i++;
-		}
-	}
-	return 1;
+    pid_t pid1, pid2;
+    int status1, status2;
+
+    // create the first child
+    if ((pid1 = fork()) == -1)
+    {
+        fprintf(stderr, "Error: %s: cannot create child 1: %s\n", cmdArgv[0], strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+    else if (pid1 == 0)
+        childOutPipe(pipeDes, cmdArgv);
+
+    if ((pid2 = fork()) == -1)
+    {
+        fprintf(stderr, "Error: %s: cannot create child 1: %s\n", cmdArgv2[0], strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+    else if (pid2 == 0)
+        childInPipe(pipeDes, cmdArgv2);
+
+    // the pipe is handed off the the childer, so we should close the parent ends
+    close(pipeDes[0]);
+    close(pipeDes[1]);
 }
 
-
-/*
-=======================================================
-EXECUTE FUNCTION
-=======================================================
-*/
-void execute()
+void childOutPipe(int pipeDes[], char *cmdArgv[])
 {
-	pid_t pid;
-	pid_t thisChildPid;
-	int status;
-	
-	strcpy(command.name, command.argv[0]);
-	command.argv[0] = basename(command.name);
-	
-	if (strcmp(command.argv[command.argc-1], "&") == 0) {
-		run_bg = 1;
-		command.argv[command.argc-1] = NULL;
-	}
-	
-	for (int i = 0; i < command.argc; i++) 
-		printf("Arg %d: %s\n", i, command.argv[i]);
-		
-	signal(SIGINT, intstpSignalHandler);
-	signal(SIGTSTP, intstpSignalHandler);
-	signal(SIGCHLD, signalHandler);
-	
-	pid = fork();
-	if (pid == -1) {	
-		/* FORK FAILED */	
-		printf("ERROR: fork()\n");
-		exit(EXIT_FAILURE);
-	} else if (pid == 0) {	
-		/* CHILD PROCESS */
-		FILE *file;
-		
-		if (file_out) {
-			file = freopen(outFile, "w", stdout);
-		}
-		
-		if (file_in) {
-			file = freopen(inFile, "r", stdin);
-		}
-		
-		if (execvp(command.name, command.argv) < 0) {
-			printf("ERROR: execvp() : %s\n", strerror(errno));
-			exit(EXIT_FAILURE);
-		}
-		
-		if (file_out) {
-			file_out = 0;
-			fclose(file);
-		}
-		
-		if (file_in) {
-			file_in = 0;
-			fclose(file);
-		}
-		
-	} else if (pid > 0) {	
-		/* PARENT PROCESS */
-		if (!run_bg) {
-			fgPid = pid;
-			fgWait = TRUE;
-			
-			while(fgWait) {
-				pause();
-			}
-		} else {
-			processCount++;
-			printf("[%d] %d\n", processCount, pid);
-			run_bg = 0;
-		}
-				
-	}
+    close(pipeDes[0]);  // close the reading end of the pipe
+
+    // re-direct stdout to the writting end of the pipe
+    if (dup2(pipeDes[1], STDOUT_FILENO) < 0)
+    {
+        perror("child 1: cannot redirect stdout to pipe");
+        exit(EXIT_FAILURE);
+    }
+    close(pipeDes[1]);  // this is now STDOUT_FILEOUT
+
+    execvp(cmdArgv[0], cmdArgv);
+    perror("Child 1: cannot run");
+    exit (EXIT_FAILURE);
 }
 
-/*
-=======================================================
-CHANGE DIRECTORY FUNCTION
-=======================================================
-*/
-void changeDir(char *path) 
+void childInPipe(int pipeDes[], char *cmdArgv[])
 {
-	if (chdir(path) < 0) {
-		printf("ERROR: chdir(): %s\n", strerror(errno));
-	}
+    close(pipeDes[1]); // close the writting end of the pipe
+
+    // re-direct stdin from the reading end of the pipe
+    if (dup2(pipeDes[0], STDIN_FILENO) < 0)
+    {
+        perror("child 2: cannot redirect stdin from pipe");
+        exit(EXIT_FAILURE);
+    }
+    close(pipeDes[0]);  // this is now STDIN_FILENO
+
+    execvp(cmdArgv[0], cmdArgv);
+    perror("Child 2: cannot run");
+    exit (EXIT_FAILURE);
 }
-
-
-/*
-=======================================================
-SIGNAL HANDLER FUNCTION
-=======================================================
-*/
-void signalHandler(int signal)
-{
-	int status;
-	pid_t pid;
-	
-	pid = wait3(&status, WNOHANG | WUNTRACED | WCONTINUED, NULL);
-	
-	if (pid == -1) {
-		printf("ERROR: waitpid() : %s\n", strerror(errno));
-		exit(EXIT_FAILURE);
-	}
-	
-	if (pid > 0) {
-		if (fgPid == pid) {
-			fgPid = -1;
-			fgWait = 0;
-			
-		} else {
-			if (WIFEXITED(status)) {
-				
-				printf("[%d] %d Done\n", processCount, pid);
-				//printf("[%d] Terminated (Status: %d)\n", pid, WEXITSTATUS(status));
-				processCount--;
-				return;
-			}
-		}
-		if (WIFSIGNALED(status)) {
-			printf("[%d] Terminated (Signal: %d)\n", pid, WTERMSIG(status));
-			processCount--;
-			return;
-		}
-		
-		if (WIFSTOPPED(status)) {
-			printf("[%d] Stopped (Signal: %d)\n", pid, WSTOPSIG(status));
-			processCount--;
-			return;
-		}
-		
-		if (WIFCONTINUED(status)) {
-			printf("[%d] Continued...\n", pid);
-			return;
-		}
-	}
-}
-
-/*
-=======================================================
-INTSTP SIGNAL HANDLER FUNCTION
-=======================================================
-*/
-void intstpSignalHandler(int signal) 
-{
-	if (fgPid != -1)
-		kill(fgPid, signal);
-}
-
-
-

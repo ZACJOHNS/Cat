@@ -29,6 +29,7 @@ MAIN FUNCTION
 */
 int main(int argc, char *argv[])
 {
+    FILE *in = stdin;
     char userInput[MAX_LINE_LENGTH];
     char *cmdArgv[MAX_ARG_NUM];
     char *nextArg = NULL;
@@ -44,13 +45,25 @@ int main(int argc, char *argv[])
         }
     }
 
-    while (1)
+    while (TRUE)
     {
         mode = NORMAL;
         printf("SHELL > ");
-        if (fgets(userInput, MAX_LINE_LENGTH, stdin) != NULL)
+
+        if (fgets(userInput, MAX_LINE_LENGTH, in) != NULL)
         {
             cmdArgc = parse(userInput, cmdArgv, &nextArg, &mode);
+
+            if (strcmp(cmdArgv[0], "source") == 0)
+            {
+                in = fopen(cmdArgv[1], "r");
+                if (in == NULL)
+                {
+                    fprintf(stderr, "Error: %s\n", strerror(errno));
+                    return EXIT_FAILURE;
+                }
+                continue;
+            }
 
             if (strcmp(cmdArgv[0], "exit") == 0)
                 return EXIT_SUCCESS;
@@ -63,6 +76,12 @@ int main(int argc, char *argv[])
 
             execute(cmdArgv, mode, &nextArg);
 
+        }
+
+        if (in != stdin)
+        {
+            fclose(in);
+            in = stdin;
         }
     }
     return EXIT_FAILURE;
@@ -111,7 +130,6 @@ int parse(char *userInput, char *cmdArgv[], char **nextArg, int *modePtr)
 
 void execute(char *cmdArgv[], int mode, char **nextArg)
 {
-<<<<<<< HEAD
     pid_t pid;
     int status;
 
@@ -135,7 +153,6 @@ void execute(char *cmdArgv[], int mode, char **nextArg)
 
         case NORMAL:
             pid = fork();
-
             if (pid < 0)
             {
                 fprintf(stderr, "Error: %s: cannot create child: %s\n", cmdArgv[0], strerror(errno));
@@ -151,75 +168,6 @@ void execute(char *cmdArgv[], int mode, char **nextArg)
         if (WEXITSTATUS(status) != 0)
             fprintf(stderr, "child %d exited with code %d\n", pid, WEXITSTATUS(status));
     }
-=======
-	pid_t pid;
-	pid_t thisChildPid;
-	int status;
-	
-	strcpy(command.name, command.argv[0]);
-	command.argv[0] = basename(command.name);
-	
-	if (strcmp(command.argv[command.argc-1], "&") == 0) {
-		run_bg = 1;
-		command.argv[command.argc-1] = NULL;
-	}
-	
-	//for (int i = 0; i < command.argc; i++) 
-	//	printf("Arg %d: %s\n", i, command.argv[i]);
-		
-	signal(SIGINT, intstpSignalHandler);
-	signal(SIGTSTP, intstpSignalHandler);
-	signal(SIGCHLD, signalHandler);
-	
-	pid = fork();
-	if (pid == -1) {	
-		/* FORK FAILED */	
-		printf("ERROR: fork()\n");
-		exit(EXIT_FAILURE);
-	} else if (pid == 0) {	
-		/* CHILD PROCESS */
-		FILE *file;
-		
-		if (file_out) {
-			file = freopen(outFile, "w", stdout);
-		}
-		
-		if (file_in) {
-			file = freopen(inFile, "r", stdin);
-		}
-		
-		if (execvp(command.name, command.argv) < 0) {
-			printf("ERROR: execvp() : %s\n", strerror(errno));
-			exit(EXIT_FAILURE);
-		}
-		
-		if (file_out) {
-			file_out = 0;
-			fclose(file);
-		}
-		
-		if (file_in) {
-			file_in = 0;
-			fclose(file);
-		}
-		
-	} else if (pid > 0) {	
-		/* PARENT PROCESS */
-		if (!run_bg) {
-			fgPid = pid;
-			fgWait = TRUE;
-			
-			while(fgWait) {
-				pause();
-			}
-		} else {
-			processCount++;
-			printf("[%d] %d\n", processCount, pid);
-			run_bg = 0;
-		}
-				
-	}
->>>>>>> 73e1d7718fd30c15683a9a432cb314789c8c13ed
 }
 
 void executePipe(int pipeDes[], char *cmdArgv[], char *cmdArgv2[])
@@ -236,6 +184,7 @@ void executePipe(int pipeDes[], char *cmdArgv[], char *cmdArgv2[])
     else if (pid1 == 0)
         childOutPipe(pipeDes, cmdArgv);
 
+    // create the second child
     if ((pid2 = fork()) == -1)
     {
         fprintf(stderr, "Error: %s: cannot create child 1: %s\n", cmdArgv2[0], strerror(errno));
